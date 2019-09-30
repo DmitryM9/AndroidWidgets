@@ -2,7 +2,13 @@ package com.sarcosuchus.widgets
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.*
+import android.content.res.Resources
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.Rect
+import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.support.annotation.ColorInt
 import android.support.annotation.StyleableRes
@@ -18,11 +24,12 @@ import kotlin.properties.Delegates
 
 private const val DEFAULT_MAX_RATING = 5
 private const val DEFAULT_MARGIN_BETWEEN = 10
+private const val DEFAULT_PADDING = 0
 
 class ColorRatingWidget @JvmOverloads constructor(
-        context: Context,
-        attrs: AttributeSet? = null,
-        defStyleAttr: Int = 0
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
     companion object {
@@ -36,11 +43,9 @@ class ColorRatingWidget @JvmOverloads constructor(
     private val startColorDefault = Color.parseColor("#66b456")
     private val middleColorDefault = Color.parseColor("#f4b342")
     private val endColorDefault = Color.parseColor("#c2362a")
+    private val srcDrawableDefault =
+        ContextCompat.getDrawable(context, R.drawable.ic_color_rating) as Drawable
     private val rect = Rect()
-
-    private val srcDrawable: Drawable by lazy {
-        ContextCompat.getDrawable(context, R.drawable.ic_color_rating)!!
-    }
 
     private val redColors: Array<Int> by lazy {
         arrayOf(Color.red(startColorDefault), Color.red(middleColorDefault), Color.red(endColorDefault))
@@ -59,6 +64,8 @@ class ColorRatingWidget @JvmOverloads constructor(
     private val paintTextSelected: Paint by lazy {
         Paint(Paint.ANTI_ALIAS_FLAG)
     }
+
+    var srcDrawable: Drawable = srcDrawableDefault
 
     private var markerWidth: Int by Delegates.observable(srcDrawable.intrinsicWidth) { _, _, newValue ->
         markerWidthWithSpace = marginBetween + newValue
@@ -89,6 +96,10 @@ class ColorRatingWidget @JvmOverloads constructor(
     var marginBetween: Int by Delegates.observable(DEFAULT_MARGIN_BETWEEN) { _, _, _ ->
         invalidate()
     }
+
+    var textPaddingTop: Int = DEFAULT_PADDING
+
+    var textPaddingBottom: Int = DEFAULT_PADDING
 
     var startColor: Int by Delegates.observable(startColorDefault) { _, _, newValue ->
         redColors[0] = Color.red(newValue)
@@ -162,25 +173,30 @@ class ColorRatingWidget @JvmOverloads constructor(
 
     init {
         attrs?.let { attributeSet ->
-            val typedArray = context.obtainStyledAttributes(attributeSet,
-                    R.styleable.ColorRatingWidget, 0, 0)
+            val typedArray = context.obtainStyledAttributes(
+                attributeSet,
+                R.styleable.ColorRatingWidget, 0, 0
+            )
 
             (0 until typedArray.indexCount)
-                    .map { typedArray.getIndex(it) }
-                    .forEach { resId ->
-                        when (resId) {
-                            R.styleable.ColorRatingWidget_text_visibility -> isTextVisibility = typedArray.getBoolean(resId, false)
-                            R.styleable.ColorRatingWidget_display_names -> displayNames = typedArray.getTextArray(resId).map { it.toString() }.toTypedArray()
-                            R.styleable.ColorRatingWidget_max_rating_value -> maxRatingValue = typedArray.getInt(resId, DEFAULT_MAX_RATING)
-                            R.styleable.ColorRatingWidget_start_zero -> isStartZero = typedArray.getBoolean(resId, false)
-                            R.styleable.ColorRatingWidget_margin_between -> marginBetween = typedArray.getDimensionPixelSize(resId, DEFAULT_MARGIN_BETWEEN)
-                            R.styleable.ColorRatingWidget_start_color -> startColor = typedArray.getColor(resId, startColorDefault)
-                            R.styleable.ColorRatingWidget_middle_color -> middleColor = typedArray.getColor(resId, middleColorDefault)
-                            R.styleable.ColorRatingWidget_end_color -> endColor = typedArray.getColor(resId, endColorDefault)
-                            R.styleable.ColorRatingWidget_text_appearance_default -> textAppearanceDefault = typedArray.getResourceId(resId, DEFAULT_NOTHING)
-                            R.styleable.ColorRatingWidget_text_appearance_selected -> textAppearanceSelected = typedArray.getResourceId(resId, DEFAULT_NOTHING)
-                        }
+                .map { typedArray.getIndex(it) }
+                .forEach { resId ->
+                    when (resId) {
+                        R.styleable.ColorRatingWidget_text_visibility -> isTextVisibility = typedArray.getBoolean(resId, false)
+                        R.styleable.ColorRatingWidget_display_names -> displayNames = typedArray.getTextArray(resId).map { it.toString() }.toTypedArray()
+                        R.styleable.ColorRatingWidget_max_rating_value -> maxRatingValue = typedArray.getInt(resId, DEFAULT_MAX_RATING)
+                        R.styleable.ColorRatingWidget_start_zero -> isStartZero = typedArray.getBoolean(resId, false)
+                        R.styleable.ColorRatingWidget_margin_between -> marginBetween = typedArray.getDimensionPixelSize(resId, DEFAULT_MARGIN_BETWEEN)
+                        R.styleable.ColorRatingWidget_text_padding_top -> textPaddingTop = typedArray.getDimensionPixelSize(resId, DEFAULT_PADDING)
+                        R.styleable.ColorRatingWidget_text_padding_bottom -> textPaddingBottom = typedArray.getDimensionPixelSize(resId, DEFAULT_PADDING)
+                        R.styleable.ColorRatingWidget_start_color -> startColor = typedArray.getColor(resId, startColorDefault)
+                        R.styleable.ColorRatingWidget_middle_color -> middleColor = typedArray.getColor(resId, middleColorDefault)
+                        R.styleable.ColorRatingWidget_end_color -> endColor = typedArray.getColor(resId, endColorDefault)
+                        R.styleable.ColorRatingWidget_text_appearance_default -> textAppearanceDefault = typedArray.getResourceId(resId, DEFAULT_NOTHING)
+                        R.styleable.ColorRatingWidget_text_appearance_selected -> textAppearanceSelected = typedArray.getResourceId(resId, DEFAULT_NOTHING)
+                        R.styleable.ColorRatingWidget_drawable -> srcDrawable = typedArray.getDrawable(resId) ?: srcDrawableDefault
                     }
+                }
             typedArray.recycle()
         }
     }
@@ -228,6 +244,9 @@ class ColorRatingWidget @JvmOverloads constructor(
         currentSelectX = calculateXFromPosition(selectItemPosition)
     }
 
+    private fun Int.pxToDp(): Float =
+        this / Resources.getSystem().displayMetrics.density
+
     private fun setTextPaint(paint: Paint, textAppearanceId: Int) {
         context.theme.obtainStyledAttributes(textAppearanceId, attrs).apply {
             @StyleableRes var i = 0
@@ -263,8 +282,8 @@ class ColorRatingWidget @JvmOverloads constructor(
             val stepStartBlue = calculateColorStep(blueColors[1], blueColors[0])
 
             Color.rgb(redColors[0] + stepStartRed * position,
-                    greenColors[0] + stepStartGreen * position,
-                    blueColors[0] + stepStartBlue * position)
+                greenColors[0] + stepStartGreen * position,
+                blueColors[0] + stepStartBlue * position)
         } else {
             val stepEndRed = calculateColorStep(redColors[2], redColors[1])
             val stepEndGreen = calculateColorStep(greenColors[2], greenColors[1])
@@ -272,8 +291,8 @@ class ColorRatingWidget @JvmOverloads constructor(
             val factor = position - stepCount
 
             Color.rgb(redColors[1] + stepEndRed * factor,
-                    greenColors[1] + stepEndGreen * factor,
-                    blueColors[1] + stepEndBlue * factor)
+                greenColors[1] + stepEndGreen * factor,
+                blueColors[1] + stepEndBlue * factor)
         }
     }
 
@@ -312,7 +331,8 @@ class ColorRatingWidget @JvmOverloads constructor(
             }
             paint.getTextBounds(text.toUpperCase(resources.configuration.locale), 0, text.length, rect)
             canvas.drawText(text, textPositionArray[index].toFloat(),
-                    (canvas.height / 2 + rect.height() / 3).toFloat(), paint)
+                (canvas.height / 2 + (rect.height() / 3 + textPaddingTop.pxToDp() - textPaddingBottom.pxToDp())), paint
+            )
         }
 
         if (displayNames == null) {
